@@ -1,0 +1,39 @@
+# This will represent a set of containers working together
+# this will create a replicaset & pods
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # object name, notice -deployment.
+  # although so far is not used anywhere
+  name: httpbin-deployment
+  # notice here, we want to use the same "universe"
+  # defined in httpbin.yml
+  namespace: httpbin-ns
+  labels:
+    target: httpbin
+
+spec:
+  # we want to have $replicas containers running
+  replicas: 2
+  # we want this for targeting which pods to scale
+  # it should match pods created with label app=httpbin-app
+  selector:
+    matchLabels:
+      app: httpbin-app
+  # This is the template for creating the replica set
+  template:
+    metadata:
+      labels:
+        # Mind the -app, this needs to match with the selector
+        # above, and with the service (so we have access to this
+        # later)
+        app: httpbin-app
+    spec:
+      # Each replica set will be consisting of the following containers
+      containers:
+      - image: docker.io/kennethreitz/httpbin
+        imagePullPolicy: IfNotPresent
+        name: httpbin-app
+        ports:
+        - containerPort: 80
