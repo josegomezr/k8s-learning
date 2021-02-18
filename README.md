@@ -3,11 +3,22 @@ K8S Learning Ground!
 
 This is gonna be my journal of learning k8s!
 
+TOC
+---
+
+* [🚨 BEFORE YOU BEGIN 🚨](#-before-you-begin-)
+* [How to read this?](#how-to-read-this)
+* [TL;DR I want easy route](#tldr-i-want-easy-route)
+* [⚠️ WARNING ⚠️](#%EF%B8%8F-warning-%EF%B8%8F)
+* [What should I do first? NAMESPACES!](#what-should-i-do-first-namespaces)
+* [Have something running, even if you can't access it yet](#have-something-running-even-if-you-cant-access-it-yet)
+* [Connecting your deployment to the "outside world"](#connecting-your-deployment-to-the-outside-world)
+* [Using request-rewriting! [optional]](#using-request-rewriting-optional)
+
 🚨 BEFORE YOU BEGIN 🚨
 ---
 
 1. GET! SOME! K8s! (Minikube, k3s, anything you can run `kubectl` against will do.).
-
 
 How to read this?
 ---
@@ -88,7 +99,7 @@ _* 💬 AFAIU there seems to be a "common pattern" to have 1 pod -> 1 container.
 
 Let's go the deployment route, reading naked in a documentation doesn't look correct, and the file definition doesn't seem to difficult either. You can see the deployment definition [here][deployment-definition-file].
 
-* 📝 **NOTE:** see that the **namespace name** matches the one we created on [👉1️⃣](#what-should-i-read-first-namespaces)
+* 📝 **NOTE:** see that the **namespace name** matches the one we created on [👉1️⃣](#what-should-i-do-first-namespaces)
 * 📝 **NOTE:** `spec.selector.matchLabels` has to have labels that matches (the name implies it, duh) what's in `spec.template.metadata.labels`. This will be used by the ReplicaSet created under the hood.
   + 
 * 📝 **NOTE:** `httpbin` exposes port 80, mind the `ports.containerPort` inside each container block.
@@ -177,7 +188,7 @@ _💬 AFAIU it's debatable if it's really the "ouside world" but it's not within
 
 Check out the service definition [here][service-definition-file].
 
-* 📝 **NOTE:** see that the **namespace name** matches the one we created on [👉1️⃣](#what-should-i-read-first-namespaces)
+* 📝 **NOTE:** see that the **namespace name** matches the one we created on [👉1️⃣](#what-should-i-do-first-namespaces)
 * 📝 **NOTE:** the service behaves as an intermediary "container"/"pod" between the outside world and your pods. It'll link traffic from the service port (`spec.ports[0].port`) into the `pod` port (`spec.ports[0].targetPort`).
 * 📝 **NOTE:** mind `spec.ports[0].targetPort` **has to match** `ports.containerPort` inside each container block.
 * 📝 **NOTE:** `spec.selector.app` **has to match** whatever we wrote in the **[deployment definition file][deployment-definition-file] on key** `spec.template.metadata.labels`.
