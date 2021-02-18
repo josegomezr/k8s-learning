@@ -1,32 +1,38 @@
-# ingress definition
-# this will allow traffic coming from the cluster
-# to be mapped to our service.
+# INGRESS DEFINITION
+# ===
+# This will allow traffic coming from the cluster to be mapped to our service.
 ---
-apiVersion: networking.k8s.io/v1
+apiVersion: networking.k8s.io/v1 # mind this
+# look the docs for the appropriate apiVersion
 kind: Ingress
 metadata:
-  # again, suffixing stuff
+  # again, suffixing stuff for brain sake
   name: httpbin-ingress
-  # our universe
+  # notice here, we want to use the same "universe" defined in httpbin.yml
   namespace: httpbin-ns
   # this is interesting, with this we tell the cluster to
   # take the matching requests according to the rules below
   # and redirect them as strip the matching path (/abc)
   annotations:
+    # this annotation is documented in https://doc.traefik.io/traefik/v1.7/configuration/backends/kubernetes/#annotations
     traefik.ingress.kubernetes.io/rule-type: PathPrefixStrip
-  labels:
-    target: httpbin
-
+  # Ingresses don't have labels apparently
+# Ingress definition
 spec:
+  # an ingress definition is comprised of rules
   rules:
-  - http:
+  - http: # don't quite know if that http is a magic word or not
+    # each http has paths to match
       paths:
+      # each path, will be used to do the mapping
       - path: /abc
         pathType: Prefix
+        # the backend section tells where to route the matched request
         backend:
+          # we want to throw the request at our service
           service:
             # this is the one in httpbin_service.yml
             name: httpbin-load-balancer
             port:
               # this is the one in httpbin_service.yml too
-              number: 8000
+              number: 80

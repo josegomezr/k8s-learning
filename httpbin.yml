@@ -1,11 +1,14 @@
-# this will encapsulate all resources
-# so they live in a mini-universe of themselves.
+# NAMESPACE DEFINITION
+# ===
+# this will encapsulate all resources so they live in a mini-universe of
+# themselves.
 ---
-apiVersion: v1
+apiVersion: v1 # note here, not all objects have the same apiVersion
 kind: Namespace
 metadata:
-  # notice the -ns (name-space) here for distinction
+  # Notice the `-ns` (name-space) here for distinction. We'll be using this
+  # For the rest of the objects.
   name: httpbin-ns
-  # we'll use this for easy deletion of everything
+  # We'll use this later for filtering resources
   labels:
     target: httpbin

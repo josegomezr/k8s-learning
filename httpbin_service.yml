@@ -1,27 +1,29 @@
-# services exposes our pods so we can access them
-# from outside the cluster (no tunneling required).
+# SERVICE DEFINITION
+# ===
+# Services exposes our pods so we can access them from outside the cluster
+# (no tunneling or network dark magic skills required).
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  # mind -load-balancer, we'll use this name
-  # for the ingress definition.
+  # mind -load-balancer, we'll use this name for the ingress definition later.
   name: httpbin-load-balancer
-  # notice here, we want to use the same "universe"
-  # defined in httpbin.yml
+  # notice here, we want to use the same "universe" defined in httpbin.yml
   namespace: httpbin-ns
+  # We'll use this later for filtering resources
   labels:
     target: httpbin
+# This is the actual definition of the service
 spec:
-  # service type load balancer is used with cloud providers
-  # to get an ip/hostname to access the server.
-  # with k3s wi'll use it with an ingress later.
+  # service type load balancer is used with cloud providers to get an
+  # ip/hostname to access the pods. The ingress (later defined) will
+  # link to this.
   type: LoadBalancer
   ports:
   - name: http
     protocol: TCP
-    port: 8000
-    targetPort: 80
-  # mind here, httpbin-app is the name defined in httpbin_deployment.yml
+    port: 80 # this is the port we want to expose for the service
+    targetPort: 80 # this is the port exposed in the pods.
+  # Mind here, httpbin-app is the name defined in httpbin_deployment.yml
   selector:
     app: httpbin-app
