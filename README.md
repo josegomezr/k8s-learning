@@ -18,6 +18,18 @@ K8s is a VERY big beast, with a TON of moving parts. I'm not focused on learning
 
 I'll do my best on keeping the files annotated so you (and future me) can follow through what's what.
 
+TL;DR I want easy route
+---
+
+```
+# create everything
+kubectl apply -f .
+# destroy everything
+kubectl delete -f .
+```
+
+It'll create (or destroy) all resources, read below 👇 what do they do and mean.
+
 ⚠️ **WARNING** ⚠️
 ---
 
