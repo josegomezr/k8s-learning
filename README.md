@@ -53,7 +53,7 @@ _💬 yes, httpbin is my test application, too lazy to create one from scratch �
 What should I do first? NAMESPACES!
 ---
 
-1️⃣ let's go with Namespaces, that one is defined in [httpbin.yml][namespace-definition-file]. In K8s **namespaces isolate resources so they don't clash on each other**.
+1️⃣ let's go with Namespaces, that one is defined in [httpbin/httpbin.yml][namespace-definition-file]. In K8s **namespaces isolate resources so they don't clash on each other**.
 
 Lets imagine this Namespace as a tiny universe where our workload will be living.
 
@@ -65,10 +65,10 @@ So **every resource** we'll use here, **WILL BE inside our** newly created **nam
 * 📝 **NOTE:** all K8S objects will need a `name`.
 * 📝 **NOTE:** the labels section is not mandatory, but it can be used to filter resources, it doesn't hurt I guess 🤷.
 
-To create the namespace, you can apply (💡 ahá, `apply` is a subcommand of `kubectl` that will create/update resources) the `httpbin.yml` file alone like:
+To create the namespace, you can apply (💡 ahá, `apply` is a subcommand of `kubectl` that will create/update resources) the `httpbin/httpbin.yml` file alone like:
 
 ```
-$ kubectl apply -f httpbin.yml
+$ kubectl apply -f httpbin/httpbin.yml
 namespace/httpbin-ns created
 ```
 
@@ -107,7 +107,7 @@ Let's go the deployment route, reading naked in a documentation doesn't look cor
 Applying this file alone:
 
 ```
-$ kubectl apply -f httpbin_deployment.yml 
+$ kubectl apply -f httpbin/httpbin_deployment.yml 
 deployment.apps/httpbin-deployment created
 ```
 
@@ -196,7 +196,7 @@ Check out the service definition [here][service-definition-file].
 Let's create it now:
 
 ```
-$ kubectl apply -f httpbin_service.yml
+$ kubectl apply -f httpbin/httpbin_service.yml
 ```
 
 If everything goes well, we get to have
@@ -298,7 +298,7 @@ Let's see it [here in the ingress definition file][ingress-definition-file]
 Let's apply this!
 
 ```
-$ kubectl apply -f httpbin_ingress.yml 
+$ kubectl apply -f httpbin/httpbin_ingress.yml 
 ingress.networking.k8s.io/httpbin-ingress created
 ```
 
@@ -355,9 +355,9 @@ Vary: Accept-Encoding
 
 ✨✨✨
 
-[namespace-definition-file]: ./httpbin.yml
-[deployment-definition-file]: ./httpbin_deployment.yml
-[service-definition-file]: ./httpbin_service.yml
-[ingress-definition-file]: ./httpbin_service.yml
+[namespace-definition-file]: ./httpbin/httpbin.yml
+[deployment-definition-file]: ./httpbin/httpbin_deployment.yml
+[service-definition-file]: ./httpbin/httpbin_service.yml
+[ingress-definition-file]: ./httpbin/httpbin_service.yml
 [traefik-k8s-annotations]: https://doc.traefik.io/traefik/v1.7/configuration/backends/kubernetes/#annotations
 [config-best-practices-naked-post]: https://kubernetes.io/docs/concepts/configuration/overview/#naked-pods-vs-replicasets-deployments-and-jobs
