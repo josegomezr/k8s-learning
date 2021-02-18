@@ -358,6 +358,6 @@ Vary: Accept-Encoding
 [namespace-definition-file]: ./httpbin/httpbin.yml
 [deployment-definition-file]: ./httpbin/httpbin_deployment.yml
 [service-definition-file]: ./httpbin/httpbin_service.yml
-[ingress-definition-file]: ./httpbin/httpbin_service.yml
+[ingress-definition-file]: ./httpbin/httpbin_ingress.yml
 [traefik-k8s-annotations]: https://doc.traefik.io/traefik/v1.7/configuration/backends/kubernetes/#annotations
 [config-best-practices-naked-post]: https://kubernetes.io/docs/concepts/configuration/overview/#naked-pods-vs-replicasets-deployments-and-jobs
