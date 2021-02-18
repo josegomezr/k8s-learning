@@ -97,7 +97,7 @@ The smallest "unit of work" in K8S is a `pod`, a `pod` is a set of containers, a
 
 _* 💬 AFAIU there seems to be a "common pattern" to have 1 pod -> 1 container. But this is not set in stone, yet?_
 
-Let's go the deployment route, reading naked in a documentation doesn't look correct, and the file definition doesn't seem to difficult either. You can see the deployment definition [here][deployment-definition-file].
+Let's go the deployment route, reading naked in a documentation doesn't look correct, and the file definition doesn't seem to difficult either. You can see the deployment definition [httpbin/httpbin_deployment.yml][deployment-definition-file].
 
 * 📝 **NOTE:** see that the **namespace name** matches the one we created on [👉1️⃣](#what-should-i-do-first-namespaces)
 * 📝 **NOTE:** `spec.selector.matchLabels` has to have labels that matches (the name implies it, duh) what's in `spec.template.metadata.labels`. This will be used by the ReplicaSet created under the hood.
@@ -186,7 +186,7 @@ _💬 AFAIU it's debatable if it's really the "ouside world" but it's not within
 * `NodePort`: as it's looks, it'll give you a port (in the cluster) that will be routed to the deployments.
 * `LoadBalancer`: this one, according to the docs, exposes your deployment using a cloud provider load balancer. I guess this is more similar to an AWS/GCP \*LB. I'll be using this one, although I don't quite sure get the difference between the two of them in my local K3S. Later I'll do tests in AWS.
 
-Check out the service definition [here][service-definition-file].
+Check out the service definition [httpbin/httpbin_service.yml][service-definition-file].
 
 * 📝 **NOTE:** see that the **namespace name** matches the one we created on [👉1️⃣](#what-should-i-do-first-namespaces)
 * 📝 **NOTE:** the service behaves as an intermediary "container"/"pod" between the outside world and your pods. It'll link traffic from the service port (`spec.ports[0].port`) into the `pod` port (`spec.ports[0].targetPort`).
@@ -289,7 +289,7 @@ So, K8S has a default http server running, that apparently I can exploit using a
 
 _💬 I'll base this heavily on what I have at hand which is K3S. in my K3S cluster `traefik` is used instead of `nginx` (as the official K8S docs show). This will affect some metadata in the ingress definition._
 
-Let's see it [here in the ingress definition file][ingress-definition-file]
+Let's see it [here in the ingress definition file httpbin/httpbin_ingress.yml][ingress-definition-file]
 
 * 📝 **NOTE:** the full docs for [traefik annotations is here][traefik-k8s-annotations]
 * 📝 **NOTE:** **SPECIAL ATTENTION** to `spec.rules[0].http.paths[0].backend.service.name` **gotta match** the load-balancer name!
