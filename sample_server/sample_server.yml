@@ -1,0 +1,14 @@
+# NAMESPACE DEFINITION
+# ===
+# this will encapsulate all resources so they live in a mini-universe of
+# themselves.
+---
+apiVersion: v1 # note here, not all objects have the same apiVersion
+kind: Namespace
+metadata:
+  # Notice the `-ns` (name-space) here for distinction. We'll be using this
+  # For the rest of the objects.
+  name: sample-server-ns
+  # We'll use this later for filtering resources
+  labels:
+    target: sample-server

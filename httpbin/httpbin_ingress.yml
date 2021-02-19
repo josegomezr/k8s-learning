@@ -35,4 +35,4 @@ spec:
             name: httpbin-load-balancer
             port:
               # this is the one in httpbin_service.yml too
-              number: 80
+              number: 8100
