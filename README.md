@@ -568,7 +568,7 @@ it seems. In the docs you can see adding a `volumes` key in the `spec` block of
 the deployment and everything magically works. But there's another required object
 a bit difficult to understand. The `PersistentVolumeClaim`.
 
-Quoting @fschueller, A `PersistentVolumeClaim`, tells K8S:
+Quoting [**@fschueller**][farah-gh-profile], A `PersistentVolumeClaim`, tells K8S:
 
 > “Please schedule this much from my volumes you know about so I can reference this in my pod spec”
 
@@ -1181,3 +1181,4 @@ wouldn't clash with our current one. Now it lives in port `8100`.
 [sample_server-deployment-definition-file]: ./sample_server/sample_server_deployment.yml
 [sample_server-service-definition-file]: ./sample_server/sample_server_service.yml
 [sample_server-pv-claim-definition-file]: ./sample_server/sample_server_pv_claim.yml
+[farah-gh-profile]: https://github.com/fschueller
