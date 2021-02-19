@@ -17,9 +17,7 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: manual
   resources:
     requests:
-      storage: 4Gi
-
-  
+      storage: 120Mi
+ 
