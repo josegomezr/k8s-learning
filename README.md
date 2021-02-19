@@ -381,10 +381,10 @@ docker run --rm -it -p 8000:8000 python:3-alpine sh -c "mkdir -p /var/data; cd /
 
 **What this container does?**
 
-1. Creates `/var/data`
-2. Change dir to `/var/data`
-3. Writes a file (conveniently, somewhat "unique" each time).
-4. Runs the server
+1. 🆕 Creates `/var/data`
+2. 🗂 Change dir to `/var/data`
+3. ✍ Writes a file (conveniently, somewhat "unique" each time).
+4. 🤖 Runs the server
 
 So far this is exactly behaving as our pods so far, if I go into the container
 and throw files to `/var/data` they'll be long gone after a new pod goes around.
@@ -396,7 +396,7 @@ our previous demo.
 We'll call this namespace: `sample-server-ns`. Let's go, copy all in `httpbin`
 into `sample_server`.
 
-The lazy route would be:
+The lazy route would be, but you can do the exercise of manually creating everything:
 
 ```
 mkdir -p sample_server/
@@ -405,6 +405,11 @@ cd sample_server/
 rename 'httpbin' 'sample_server' ./*
 sed -i 's/httpbin/sample-server/' ./*.yml
 ```
+* 📝 **NOTE:** don't know how available the `rename` command. I have it in all
+my machines
+* 📝 **NOTE:** this will mess up with the image name, but don't worry, we still need to change it down the line.
+* 📝 **NOTE:** If you're cloning this repo, this is kinda pointless because the
+files are already there fixed.
 
 Adapting our pods to be python http.server
 ---
@@ -422,20 +427,18 @@ the deployment:
 -      - image: docker.io/kennethreitz/httpbin
 +      - image: 'python:3-alpine'
          imagePullPolicy: IfNotPresent
-# here the name changes
--        name: httpbin-pod-container
-+        name: sample-server-pod-container
 # adding the command
 +        command: ['sh', '-c', 'mkdir -p /var/data; cd /var/data; echo $(hostname): $(date) > "$(hostname)-$(date +%s).txt"; python3 -m http.server']
          # expose the http service port of our image.
          ports:
-# here the containerPort
+# and here the containerPort
 -        - containerPort: 80
 +        - containerPort: 8000
 ```
 
 For this example, we'll take out the ingress, we no gonna use it right now.
-Later on we might take it back.
+
+_💬 Later on (maybe another deployment?) we might take it back._
 
 ```
 rm sample_server/sample_server_ingress.yml
@@ -445,7 +448,13 @@ And last let's also tweak the service. You can
 [see it here sample_server/sample_server_service.yml][sample_server-service-definition-file]. Here let's see the diff for the service:
 
 ```
-# port here
+# port here.
+# Funny enough, this port has to be unique if you're using a setup like me
+# where you have a single node K8S. Else you'll endup having a waiting for
+# schedule pod that will never start because of the busy port.
+-    port: 8100
++    port: 8101
+# target port here
 -    targetPort: 80 # this is the port exposed in the pods.
 #...
 +    targetPort: 8000 # this is the port exposed in the pods.
@@ -471,12 +480,13 @@ Annotations:              <none>
 Selector:                 app=sample-server-app
 Type:                     LoadBalancer
 IP Families:              <none>
-IP:                       10.43.108.209
-IPs:                      10.43.108.209
-Port:                     http  80/TCP
+IP:                       10.43.254.216
+IPs:                      10.43.254.216
+LoadBalancer Ingress:     192.168.122.76
+Port:                     http  8101/TCP
 TargetPort:               8000/TCP
-NodePort:                 http  32645/TCP
-Endpoints:                <none>
+NodePort:                 http  31008/TCP
+Endpoints:                10.42.0.127:8000,10.42.0.128:8000
 Session Affinity:         None
 External Traffic Policy:  Cluster
 Events:                   <none>
@@ -485,12 +495,12 @@ Events:                   <none>
 Now, let's query that node:
 
 ```
-$ curl --dump-header - 192.168.122.76:32645
+$ curl --dump-header - 192.168.122.76:31008
 HTTP/1.0 200 OK
 Server: SimpleHTTP/0.6 Python/3.9.1
-Date: Fri, 19 Feb 2021 12:26:00 GMT
+Date: Fri, 19 Feb 2021 14:53:57 GMT
 Content-type: text/html; charset=utf-8
-Content-Length: 434
+Content-Length: 571
 
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
@@ -502,7 +512,8 @@ Content-Length: 434
 <h1>Directory listing for /</h1>
 <hr>
 <ul>
-<li><a href="sample-server-deployment-69958fcd4c-cdngw-1613737473.txt">sample-server-deployment-69958fcd4c-cdngw-1613737473.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-4wv7z-1613745329.txt">sample-server-deployment-6449668b9c-4wv7z-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-lq48c-1613745329.txt">sample-server-deployment-6449668b9c-lq48c-1613745329.txt</a></li>
 </ul>
 <hr>
 </body>
@@ -546,6 +557,612 @@ and create it again. You'll see the filenames change :).
 Creating the volume
 -------------------
 
+SO, not quite sure how to explain this. but adding volumes is not as simple as
+it seems. In the docs you can see adding a `volumes` key in the `spec` block of
+the deployment and everything magically works. But there's another required object
+a bit difficult to understand. The `PersistentVolumeClaim`.
+
+Quoting @fschueller, A `PersistentVolumeClaim`, tells K8S:
+
+> “Please schedule this much from my volumes you know about so I can reference this in my pod spec”
+
+So in our PVC (because acronyms are popz), we'll be telling K8S we want some
+disk (120MiB in my case, pretty arbitrary number, apparently anything below
+100MiB raises issues depending on the storage driver/controller/class? 🤷)
+
+The file structure is rather simple, you can see it here [sample_server/sample_server_pv_claim.yml][sample_server-pv-claim-definition-file]
+
+Let's apply it!
+
+```
+$ kubectl apply -f sample_server_pv_claim.yml
+persistentvolumeclaim/sample-server-pv-claim created
+```
+
+Now if we inspect it:
+
+```
+# pv is short for persistentvolume
+$ kubectl --namespace sample-server-ns describe pv sample-server-pv
+Name:              sample-server-pv
+Labels:            target=sample-server
+Annotations:       <none>
+Finalizers:        [kubernetes.io/pv-protection]
+StorageClass:      local-storage
+Status:            Available
+Claim:             
+Reclaim Policy:    Delete
+Access Modes:      RWO
+VolumeMode:        Filesystem
+Capacity:          50Mi
+Node Affinity:     
+  Required Terms:  
+    Term 0:        kubernetes.io/os in [linux]
+Message:           
+Source:
+    Type:  LocalVolume (a persistent volume backed by local storage on a node)
+    Path:  /var/pod_data
+Events:    <none>
+```
+
+_💬 Weird it says 50Mi, but for my current use case I don't mind. Maybe is elastic? 🤔_
+
+Now, we point in the deployment file, that we want to use this reserved space.
+
+```
+    spec:
+# ... comments ...
++      volumes:
++      - name: sample-server-pv-storage # Achtung! this will be used below
++        persistentVolumeClaim:
++          claimName: sample-server-pv-claim # Achtung! sample_server_pv_claim.yml
+# ... down below ...
+        ports:
+        - containerPort: 8000
++        volumeMounts:
++        - mountPath: "/var/data"
++          name: sample-server-pv-storage
+```
+
+As stated early, the file is already fixed in the repo, so we can apply it right
+away. See the file [here sample_server/sample_server_deployment.yml][sample_server-deployment-definition-file]
+
+```
+$ kubectl apply -f sample_server_deployment.yml
+deployment.apps/httpbin-deployment configured
+```
+
+So after we have this, let's sync up. I'll dump here my namespace, pod, services.
+
+```
+$ kubectl --namespace sample-server-ns describe pod
+Name:         sample-server-deployment-6449668b9c-4wv7z
+Namespace:    sample-server-ns
+Priority:     0
+Node:         localhost/192.168.122.76
+Start Time:   Fri, 19 Feb 2021 15:35:27 +0100
+Labels:       app=sample-server-app
+              pod-template-hash=6449668b9c
+Annotations:  <none>
+Status:       Running
+IP:           10.42.0.127
+IPs:
+  IP:           10.42.0.127
+Controlled By:  ReplicaSet/sample-server-deployment-6449668b9c
+Containers:
+  sample-server-pod-container:
+    Container ID:  containerd://2327a32ba6461457ab0849a0e599afe0bb613cf67c8a40dffb22b4b8ecd0d3a0
+    Image:         python:3-alpine
+    Image ID:      docker.io/library/python@sha256:e48dd378740e8dc680553ec91a2f8d80a87743a4ec43494695c21a2323a749ee
+    Port:          8000/TCP
+    Host Port:     0/TCP
+    Command:
+      sh
+      -c
+      mkdir -p /var/data; cd /var/data; echo $(hostname): $(date) > "$(hostname)-$(date +%s).txt"; python3 -m http.server
+    State:          Running
+      Started:      Fri, 19 Feb 2021 15:35:29 +0100
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/data from sample-server-pv-storage (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-x8ftm (ro)
+Conditions:
+  Type              Status
+  Initialized       True 
+  Ready             True 
+  ContainersReady   True 
+  PodScheduled      True 
+Volumes:
+  sample-server-pv-storage:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  sample-server-pv-claim
+    ReadOnly:   false
+  default-token-x8ftm:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  default-token-x8ftm
+    Optional:    false
+QoS Class:       BestEffort
+Node-Selectors:  <none>
+Tolerations:     node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                 node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  26m   default-scheduler  Successfully assigned sample-server-ns/sample-server-deployment-6449668b9c-4wv7z to localhost
+  Normal  Pulled     26m   kubelet            Container image "python:3-alpine" already present on machine
+  Normal  Created    26m   kubelet            Created container sample-server-pod-container
+  Normal  Started    26m   kubelet            Started container sample-server-pod-container
+
+
+Name:         sample-server-deployment-6449668b9c-lq48c
+Namespace:    sample-server-ns
+Priority:     0
+Node:         localhost/192.168.122.76
+Start Time:   Fri, 19 Feb 2021 15:35:27 +0100
+Labels:       app=sample-server-app
+              pod-template-hash=6449668b9c
+Annotations:  <none>
+Status:       Running
+IP:           10.42.0.128
+IPs:
+  IP:           10.42.0.128
+Controlled By:  ReplicaSet/sample-server-deployment-6449668b9c
+Containers:
+  sample-server-pod-container:
+    Container ID:  containerd://76c4083f9946060dc4e2ef73dfaafbe9d97d6943d045097e36ff9529014ab6b5
+    Image:         python:3-alpine
+    Image ID:      docker.io/library/python@sha256:e48dd378740e8dc680553ec91a2f8d80a87743a4ec43494695c21a2323a749ee
+    Port:          8000/TCP
+    Host Port:     0/TCP
+    Command:
+      sh
+      -c
+      mkdir -p /var/data; cd /var/data; echo $(hostname): $(date) > "$(hostname)-$(date +%s).txt"; python3 -m http.server
+    State:          Running
+      Started:      Fri, 19 Feb 2021 15:35:29 +0100
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/data from sample-server-pv-storage (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-x8ftm (ro)
+Conditions:
+  Type              Status
+  Initialized       True 
+  Ready             True 
+  ContainersReady   True 
+  PodScheduled      True 
+Volumes:
+  sample-server-pv-storage:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  sample-server-pv-claim
+    ReadOnly:   false
+  default-token-x8ftm:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  default-token-x8ftm
+    Optional:    false
+QoS Class:       BestEffort
+Node-Selectors:  <none>
+Tolerations:     node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                 node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  FailedScheduling  26m   default-scheduler  running PreBind plugin "VolumeBinding": Operation cannot be fulfilled on persistentvolumeclaims "sample-server-pv-claim": the object has been modified; please apply your changes to the latest version and try again
+  Normal   Scheduled         26m   default-scheduler  Successfully assigned sample-server-ns/sample-server-deployment-6449668b9c-lq48c to localhost
+  Normal   Pulled            26m   kubelet            Container image "python:3-alpine" already present on machine
+  Normal   Created           26m   kubelet            Created container sample-server-pod-container
+  Normal   Started           26m   kubelet            Started container sample-server-pod-container
+
+
+Name:         svclb-sample-server-load-balancer-8rxz5
+Namespace:    sample-server-ns
+Priority:     0
+Node:         localhost/192.168.122.76
+Start Time:   Fri, 19 Feb 2021 15:52:13 +0100
+Labels:       app=svclb-sample-server-load-balancer
+              controller-revision-hash=6b7bc6df8d
+              pod-template-generation=2
+              svccontroller.k3s.cattle.io/svcname=sample-server-load-balancer
+Annotations:  <none>
+Status:       Running
+IP:           10.42.0.132
+IPs:
+  IP:           10.42.0.132
+Controlled By:  DaemonSet/svclb-sample-server-load-balancer
+Containers:
+  lb-port-8101:
+    Container ID:   containerd://49352eee37a75eea0e6d2b2bb750cb45ee488f89d12f768899de69c956002520
+    Image:          rancher/klipper-lb:v0.1.2
+    Image ID:       docker.io/rancher/klipper-lb@sha256:2fb97818f5d64096d635bc72501a6cb2c8b88d5d16bc031cf71b5b6460925e4a
+    Port:           8101/TCP
+    Host Port:      8101/TCP
+    State:          Running
+      Started:      Fri, 19 Feb 2021 15:52:15 +0100
+    Ready:          True
+    Restart Count:  0
+    Environment:
+      SRC_PORT:    8101
+      DEST_PROTO:  TCP
+      DEST_PORT:   8101
+      DEST_IP:     10.43.254.216
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-x8ftm (ro)
+Conditions:
+  Type              Status
+  Initialized       True 
+  Ready             True 
+  ContainersReady   True 
+  PodScheduled      True 
+Volumes:
+  default-token-x8ftm:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  default-token-x8ftm
+    Optional:    false
+QoS Class:       BestEffort
+Node-Selectors:  <none>
+Tolerations:     CriticalAddonsOnly op=Exists
+                 node-role.kubernetes.io/control-plane:NoSchedule op=Exists
+                 node-role.kubernetes.io/master:NoSchedule op=Exists
+                 node.kubernetes.io/disk-pressure:NoSchedule op=Exists
+                 node.kubernetes.io/memory-pressure:NoSchedule op=Exists
+                 node.kubernetes.io/not-ready:NoExecute op=Exists
+                 node.kubernetes.io/pid-pressure:NoSchedule op=Exists
+                 node.kubernetes.io/unreachable:NoExecute op=Exists
+                 node.kubernetes.io/unschedulable:NoSchedule op=Exists
+Events:
+  Type    Reason     Age    From               Message
+  ----    ------     ----   ----               -------
+  Normal  Scheduled  9m18s  default-scheduler  Successfully assigned sample-server-ns/svclb-sample-server-load-balancer-8rxz5 to localhost
+  Normal  Pulled     9m17s  kubelet            Container image "rancher/klipper-lb:v0.1.2" already present on machine
+  Normal  Created    9m16s  kubelet            Created container lb-port-8101
+  Normal  Started    9m16s  kubelet            Started container lb-port-8101
+```
+
+And my service:
+
+```
+$ kubectl --namespace sample-server-ns describe svc
+Name:                     sample-server-load-balancer
+Namespace:                sample-server-ns
+Labels:                   target=sample-server
+Annotations:              <none>
+Selector:                 app=sample-server-app
+Type:                     LoadBalancer
+IP Families:              <none>
+IP:                       10.43.254.216
+IPs:                      10.43.254.216
+LoadBalancer Ingress:     192.168.122.76
+Port:                     http  8101/TCP
+TargetPort:               8000/TCP
+NodePort:                 http  31008/TCP
+Endpoints:                10.42.0.127:8000,10.42.0.128:8000
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
+```
+
+Finally, let's start querying. If everything goes well, we have to issue several
+requests and always get the same response no matter what.
+
+
+```
+$ curl --dump-header - 192.168.122.76:31008
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.9.1
+Date: Fri, 19 Feb 2021 15:03:29 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 571
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="sample-server-deployment-6449668b9c-4wv7z-1613745329.txt">sample-server-deployment-6449668b9c-4wv7z-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-lq48c-1613745329.txt">sample-server-deployment-6449668b9c-lq48c-1613745329.txt</a></li>
+</ul>
+<hr>
+</body>
+</html>
+
+$ curl --dump-header - 192.168.122.76:31008
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.9.1
+Date: Fri, 19 Feb 2021 15:03:30 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 571
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="sample-server-deployment-6449668b9c-4wv7z-1613745329.txt">sample-server-deployment-6449668b9c-4wv7z-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-lq48c-1613745329.txt">sample-server-deployment-6449668b9c-lq48c-1613745329.txt</a></li>
+</ul>
+<hr>
+</body>
+</html>
+
+$ curl --dump-header - 192.168.122.76:31008
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.9.1
+Date: Fri, 19 Feb 2021 15:03:31 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 571
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="sample-server-deployment-6449668b9c-4wv7z-1613745329.txt">sample-server-deployment-6449668b9c-4wv7z-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-lq48c-1613745329.txt">sample-server-deployment-6449668b9c-lq48c-1613745329.txt</a></li>
+</ul>
+<hr>
+</body>
+</html>
+
+$ curl --dump-header - 192.168.122.76:31008
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.9.1
+Date: Fri, 19 Feb 2021 15:03:31 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 571
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="sample-server-deployment-6449668b9c-4wv7z-1613745329.txt">sample-server-deployment-6449668b9c-4wv7z-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-lq48c-1613745329.txt">sample-server-deployment-6449668b9c-lq48c-1613745329.txt</a></li>
+</ul>
+<hr>
+</body>
+</html>
+
+$ curl --dump-header - 192.168.122.76:31008
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.9.1
+Date: Fri, 19 Feb 2021 15:03:32 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 571
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="sample-server-deployment-6449668b9c-4wv7z-1613745329.txt">sample-server-deployment-6449668b9c-4wv7z-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-lq48c-1613745329.txt">sample-server-deployment-6449668b9c-lq48c-1613745329.txt</a></li>
+</ul>
+<hr>
+</body>
+</html>
+```
+
+✨✨✨
+
+**GREAT NEWS**
+* ✅ Our deployment seems to have persistent storage! 🤩
+
+✨✨✨
+
+Proving the storage is persistent
+---
+
+To make sure we're REALLY outliving the pods with our storage, let's scale
+the deployment down to 0 replicas, wait some 10 secs, then re-scale it to 3
+nodes. If our setup is correct, we should see now 5 files in the list.
+
+The previous 2, and 3 new ones, and the ALL have to keep replying the same list.
+No matter how many times we request it.
+
+To scale down a deployment:
+
+
+**📝 NOTE:** `--namespace` flag
+**📝 NOTE:** `--replicas` flag will edit the `spec.replicas` that we defiened as
+`2` to `0` dynamically.
+
+```
+$ kubectl --namespace sample-server-ns scale deployment sample-server-deployment --replicas 0
+deployment.apps/sample-server-deployment scaled
+```
+
+Let's see if we have pods
+
+```
+$ kubectl --namespace sample-server-ns get pods -o wide
+deployment.apps/sample-server-deployment scaled
+NAME                                        READY   STATUS        RESTARTS   AGE   IP            NODE        NOMINATED NODE   READINESS GATES
+svclb-sample-server-load-balancer-8rxz5     1/1     Running       0          15m   10.42.0.132   localhost   <none>           <none>
+sample-server-deployment-6449668b9c-lq48c   0/1     Terminating   0          32m   10.42.0.128   localhost   <none>           <none>
+sample-server-deployment-6449668b9c-4wv7z   0/1     Terminating   0          32m   10.42.0.127   localhost   <none>           <none>
+```
+
+Ahá, terminating, let's wait a bit.
+
+```
+$ kubectl --namespace sample-server-ns get pods -o wide
+NAME                                      READY   STATUS    RESTARTS   AGE   IP            NODE        NOMINATED NODE   READINESS GATES
+svclb-sample-server-load-balancer-8rxz5   1/1     Running   0          16m   10.42.0.132   localhost   <none>           <none>
+```
+
+Great, no more pods, now let's scale it up!
+
+```
+$ kubectl --namespace sample-server-ns scale deployment sample-server-deployment --replicas 3
+deployment.apps/sample-server-deployment scaled
+```
+
+
+Let's have a look at the pods:
+```
+$ kubectl --namespace sample-server-ns get pods -o wide
+NAME                                        READY   STATUS              RESTARTS   AGE   IP            NODE        NOMINATED NODE   READINESS GATES
+svclb-sample-server-load-balancer-8rxz5     1/1     Running             0          16m   10.42.0.132   localhost   <none>           <none>
+sample-server-deployment-6449668b9c-rb4rg   0/1     ContainerCreating   0          3s    <none>        localhost   <none>           <none>
+sample-server-deployment-6449668b9c-n77kz   0/1     ContainerCreating   0          3s    <none>        localhost   <none>           <none>
+sample-server-deployment-6449668b9c-6sd9l   0/1     ContainerCreating   0          3s    <none>        localhost   <none>           <none>
+```
+
+Let's wait a bit and retry
+```
+$ kubectl --namespace sample-server-ns get pods -o wide
+NAME                                        READY   STATUS    RESTARTS   AGE   IP            NODE        NOMINATED NODE   READINESS GATES
+svclb-sample-server-load-balancer-8rxz5     1/1     Running   0          17m   10.42.0.132   localhost   <none>           <none>
+sample-server-deployment-6449668b9c-6sd9l   1/1     Running   0          16s   10.42.0.135   localhost   <none>           <none>
+sample-server-deployment-6449668b9c-n77kz   1/1     Running   0          16s   10.42.0.133   localhost   <none>           <none>
+sample-server-deployment-6449668b9c-rb4rg   1/1     Running   0          16s   10.42.0.134   localhost   <none>           <none>
+```
+
+Great, they appear as running, now, let's curl this thing up (pun intended).
+
+```
+$ curl --dump-header - 192.168.122.76:31008
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.9.1
+Date: Fri, 19 Feb 2021 15:10:06 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 982
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="sample-server-deployment-6449668b9c-4wv7z-1613745329.txt">sample-server-deployment-6449668b9c-4wv7z-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-6sd9l-1613747352.txt">sample-server-deployment-6449668b9c-6sd9l-1613747352.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-lq48c-1613745329.txt">sample-server-deployment-6449668b9c-lq48c-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-n77kz-1613747351.txt">sample-server-deployment-6449668b9c-n77kz-1613747351.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-rb4rg-1613747353.txt">sample-server-deployment-6449668b9c-rb4rg-1613747353.txt</a></li>
+</ul>
+<hr>
+</body>
+</html>
+```
+
+✨✨✨
+
+**AWESOME!!**
+* ✅ We kept the previous two files from the old pods, and created 3 news from
+the current replica. WE HAVE ACHIEVED PERSISTENT STORAGE!
+
+✨✨✨
+
+And if we run curl again several times the file names won't change:
+
+```
+$ curl --dump-header - 192.168.122.76:31008
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.9.1
+Date: Fri, 19 Feb 2021 15:11:02 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 982
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="sample-server-deployment-6449668b9c-4wv7z-1613745329.txt">sample-server-deployment-6449668b9c-4wv7z-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-6sd9l-1613747352.txt">sample-server-deployment-6449668b9c-6sd9l-1613747352.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-lq48c-1613745329.txt">sample-server-deployment-6449668b9c-lq48c-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-n77kz-1613747351.txt">sample-server-deployment-6449668b9c-n77kz-1613747351.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-rb4rg-1613747353.txt">sample-server-deployment-6449668b9c-rb4rg-1613747353.txt</a></li>
+</ul>
+<hr>
+</body>
+</html>
+
+$ curl --dump-header - 192.168.122.76:31008
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.9.1
+Date: Fri, 19 Feb 2021 15:11:03 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 982
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="sample-server-deployment-6449668b9c-4wv7z-1613745329.txt">sample-server-deployment-6449668b9c-4wv7z-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-6sd9l-1613747352.txt">sample-server-deployment-6449668b9c-6sd9l-1613747352.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-lq48c-1613745329.txt">sample-server-deployment-6449668b9c-lq48c-1613745329.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-n77kz-1613747351.txt">sample-server-deployment-6449668b9c-n77kz-1613747351.txt</a></li>
+<li><a href="sample-server-deployment-6449668b9c-rb4rg-1613747353.txt">sample-server-deployment-6449668b9c-rb4rg-1613747353.txt</a></li>
+</ul>
+<hr>
+</body>
+</html>
+```
+
+✨✨✨
+
+**AWESOME!!**
+
+✨✨✨
+
+Now a couple of notes:
+
+**📝 NOTE:** The storage is "persistent" from the pods perspective, but it's
+relaying on the cluster file storage, this can incurr in inavailablily. You can
+change the storage class to something more "persistent", like a hard disk in AWS
+(AWS EBS [Elastic Block Service] for example).
+
+**📝 NOTE:** The diffs might be difficult to follow if you want to go step by
+step :/ but is more about my train of thought/research than replicating exactly
+my steps. Sorry 😅
+
+**📝 NOTE:** had to change the port in our previous deployment `httpbin` so it
+wouldn't clash with our current one. Now it lives in port `8100`.
+
 
 <!-- Links for 1st chapter -->
 [httpbin-namespace-definition-file]: ./httpbin/httpbin.yml
@@ -557,4 +1174,4 @@ Creating the volume
 <!-- Links for 2nd chapter -->
 [sample_server-deployment-definition-file]: ./sample_server/sample_server_deployment.yml
 [sample_server-service-definition-file]: ./sample_server/sample_server_service.yml
-[sample_server-ingress-definition-file]: ./sample_server/sample_server_ingress.yml
+[sample_server-pv-claim-definition-file]: ./sample_server/sample_server_pv_claim.yml

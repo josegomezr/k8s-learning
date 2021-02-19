@@ -1,4 +1,4 @@
-# NAMESPACE DEFINITION
+# PERSISTENT VOLUME CLAIM DEFINITION
 # ===
 # this will encapsulate all resources so they live in a mini-universe of
 # themselves.
@@ -6,8 +6,8 @@
 apiVersion: v1 # note here, not all objects have the same apiVersion
 kind: PersistentVolumeClaim
 metadata:
-  # Notice the `-ns` (name-space) here for distinction. We'll be using this
-  # For the rest of the objects.
+  # Notice the `-pv-claim` (persistent-volume-claim) here for distinction. We'll 
+  # be using this in the pods.
   name: sample-server-pv-claim
   # notice here, we want to use the same "universe" defined in sample-server.yml
   namespace: sample-server-ns
@@ -20,4 +20,3 @@ spec:
   resources:
     requests:
       storage: 120Mi
- 

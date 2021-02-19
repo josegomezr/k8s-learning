@@ -29,11 +29,12 @@ spec:
         # the service (so we have access to this later).
         app: sample-server-app
     spec:
+      # here we define volumes this volumes will be shared amongst containers
+      # notice the name, we'll use it below.
       volumes:
-      - name: sample-server-pv-storage
+      - name: sample-server-pv-storage # Achtung!
         persistentVolumeClaim:
-          claimName: sample-server-pv-claim
-
+          claimName: sample-server-pv-claim # Achtung! sample_server_pv_claim.yml
       # Each replica will be consisting of the following containers.
       containers:
       - image: 'python:3-alpine'
@@ -43,6 +44,7 @@ spec:
         # expose the http service port of our image.
         ports:
         - containerPort: 8000
+        # and here we mount the volumes defined before
         volumeMounts:
         - mountPath: "/var/data"
           name: sample-server-pv-storage

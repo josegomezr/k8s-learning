@@ -22,7 +22,10 @@ spec:
   ports:
   - name: http
     protocol: TCP
-    port: 80 # this is the port we want to expose for the service
+    port: 8100 # this is the port we want to expose for the service
+    # funny enough THIS PORT can't be repeated, I learned it afterwards.
+    # so you have to use unique ports here (at least in my single-node k3s
+    # server).
     targetPort: 80 # this is the port exposed in the pods.
   # Mind here, httpbin-app is the name defined in httpbin_deployment.yml
   selector:
