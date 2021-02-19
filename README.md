@@ -53,7 +53,7 @@ _💬 yes, httpbin is my test application, too lazy to create one from scratch �
 What should I do first? NAMESPACES!
 ---
 
-1️⃣ let's go with Namespaces, that one is defined in [httpbin/httpbin.yml][namespace-definition-file]. In K8s **namespaces isolate resources so they don't clash on each other**.
+1️⃣ let's go with Namespaces, that one is defined in [httpbin/httpbin.yml][httpbin-namespace-definition-file]. In K8s **namespaces isolate resources so they don't clash on each other**.
 
 Lets imagine this Namespace as a tiny universe where our workload will be living.
 
@@ -97,7 +97,7 @@ The smallest "unit of work" in K8S is a `pod`, a `pod` is a set of containers, a
 
 _* 💬 AFAIU there seems to be a "common pattern" to have 1 pod -> 1 container. But this is not set in stone, yet?_
 
-Let's go the deployment route, reading naked in a documentation doesn't look correct, and the file definition doesn't seem to difficult either. You can see the deployment definition [httpbin/httpbin_deployment.yml][deployment-definition-file].
+Let's go the deployment route, reading naked in a documentation doesn't look correct, and the file definition doesn't seem to difficult either. You can see the deployment definition [httpbin/httpbin_deployment.yml][httpbin-deployment-definition-file].
 
 * 📝 **NOTE:** see that the **namespace name** matches the one we created on [👉1️⃣](#what-should-i-do-first-namespaces)
 * 📝 **NOTE:** `spec.selector.matchLabels` has to have labels that matches (the name implies it, duh) what's in `spec.template.metadata.labels`. This will be used by the ReplicaSet created under the hood.
@@ -186,12 +186,12 @@ _💬 AFAIU it's debatable if it's really the "ouside world" but it's not within
 * `NodePort`: as it's looks, it'll give you a port (in the cluster) that will be routed to the deployments.
 * `LoadBalancer`: this one, according to the docs, exposes your deployment using a cloud provider load balancer. I guess this is more similar to an AWS/GCP \*LB. I'll be using this one, although I don't quite sure get the difference between the two of them in my local K3S. Later I'll do tests in AWS.
 
-Check out the service definition [httpbin/httpbin_service.yml][service-definition-file].
+Check out the service definition [httpbin/httpbin_service.yml][httpbin-service-definition-file].
 
 * 📝 **NOTE:** see that the **namespace name** matches the one we created on [👉1️⃣](#what-should-i-do-first-namespaces)
 * 📝 **NOTE:** the service behaves as an intermediary "container"/"pod" between the outside world and your pods. It'll link traffic from the service port (`spec.ports[0].port`) into the `pod` port (`spec.ports[0].targetPort`).
 * 📝 **NOTE:** mind `spec.ports[0].targetPort` **has to match** `ports.containerPort` inside each container block.
-* 📝 **NOTE:** `spec.selector.app` **has to match** whatever we wrote in the **[deployment definition file][deployment-definition-file] on key** `spec.template.metadata.labels`.
+* 📝 **NOTE:** `spec.selector.app` **has to match** whatever we wrote in the **[deployment definition file][httpbin-deployment-definition-file] on key** `spec.template.metadata.labels`.
 
 Let's create it now:
 
@@ -289,9 +289,9 @@ So, K8S has a default http server running, that apparently I can exploit using a
 
 _💬 I'll base this heavily on what I have at hand which is K3S. in my K3S cluster `traefik` is used instead of `nginx` (as the official K8S docs show). This will affect some metadata in the ingress definition._
 
-Let's see it [here in the ingress definition file httpbin/httpbin_ingress.yml][ingress-definition-file]
+Let's see it [here in the ingress definition file httpbin/httpbin_ingress.yml][httpbin-ingress-definition-file]
 
-* 📝 **NOTE:** the full docs for [traefik annotations is here][traefik-k8s-annotations]
+* 📝 **NOTE:** the full docs for [traefik annotations is here][httpbin-traefik-k8s-annotations]
 * 📝 **NOTE:** **SPECIAL ATTENTION** to `spec.rules[0].http.paths[0].backend.service.name` **gotta match** the load-balancer name!
 * 📝 **NOTE:** **SPECIAL ATTENTION** to `spec.rules[0].http.paths[0].backend.service.port.number` **gotta match** the load-balancer exposed port! _(💡 AHÁ! here's used! 🤩)_
 
@@ -355,9 +355,139 @@ Vary: Accept-Encoding
 
 ✨✨✨
 
-[namespace-definition-file]: ./httpbin/httpbin.yml
-[deployment-definition-file]: ./httpbin/httpbin_deployment.yml
-[service-definition-file]: ./httpbin/httpbin_service.yml
-[ingress-definition-file]: ./httpbin/httpbin_ingress.yml
-[traefik-k8s-annotations]: https://doc.traefik.io/traefik/v1.7/configuration/backends/kubernetes/#annotations
+---
+
+2nd session
+===========
+
+Ok, so far our pods works, but they:
+
+1. Are not connected to any "persistent" service (like a DB or something).
+2. Are ephimeral, anything they write to the container fs will be lost upon
+redeployment and/or scaling.
+
+The first item I feel it a bit complex for my introduction, so I'll go first
+with the second, let's have some persistent storage, but `httpbin` wouldn't pay
+attention to it 🤔 we gonna need another application.
+
+Honestly, I'm not feeling like making yet another application, so to demonstrate
+this I'll go the hyper lazy way. I'll spin up a pod with a python web server.
+
+Practically mimicing this:
+
+```
+docker run --rm -it -p 8000:8000 python:3-alpine sh -c "mkdir -p /var/data; cd /var/data; echo $(date) > $(date +%s).txt; python3 -m http.server"
+```
+
+**What this container does?**
+
+1. Creates `/var/data`
+2. Change dir to `/var/data`
+3. Writes a file (conveniently, a "unique" each time).
+4. Runs the server
+
+So far this is exactly behaving as our pods so far, if I go into the container
+and throw files to `/var/data` they'll be long gone after a new pod goes around.
+We need some equivalent of `-v` flag in docker in our K8S setup.
+
+For this, I'll create another folder and a new namespace so we don't clash with
+our previous demo.
+
+We'll call this namespace: `sample-server-ns`. Let's go, copy all in `httpbin`
+into `sample_server`.
+
+The lazy route would be:
+
+```
+mkdir -p sample_server/
+cp httpbin/*.yml sample_server/
+cd sample_server/
+rename 'httpbin' 'sample_server' ./*
+sed -i 's/httpbin/sample-server/' ./*.yml
+```
+
+Adapting our pods to be python http.server
+---
+
+So, by default python3's `http.server` module will list all files in PWD/CWD and
+listen in port **8000**. Let's add first the command and change the
+`containerPort`/`targetPort`.
+
+You can [see it here sample_server/sample_server_deployment.yml][sample_server-deployment-definition-file]. Here let's see the diff for
+the deployment:
+
+```diff
+       containers:
+# here the image changes
+-      - image: docker.io/kennethreitz/httpbin
++      - image: 'python:3-alpine'
+         imagePullPolicy: IfNotPresent
+# here the name changes
+-        name: httpbin-pod-container
++        name: sample-server-pod-container
+# adding the command
++        command: ['sh', '-c', 'mkdir -p /var/data; cd /var/data; echo $(date) > $(date +%s).txt; python3 -m http.server']
+         # expose the http service port of our image.
+         ports:
+# here the containerPort
+-        - containerPort: 80
++        - containerPort: 8000
+```
+
+For this example, we'll take out the ingress, we no gonna use it right now.
+Later on we might take it back.
+
+```
+rm sample_server/sample_server_ingress.yml
+```
+
+And last let's also tweak the service. You can
+[see it here sample_server/sample_server_service.yml][sample_server-service-definition-file]. Here let's see the diff for the service:
+
+```
+# port here
+-    targetPort: 80 # this is the port exposed in the pods.
+#...
++    targetPort: 8000 # this is the port exposed in the pods.
+```
+
+Now, let's apply this and see how it behaves!
+
+```
+$ kubectl apply -f .
+namespace/sample-server-ns unchanged
+deployment.apps/sample-server-deployment configured
+service/sample-server-load-balancer created
+```
+
+Now let's have a look at the describe block:
+
+```
+$ kubectl --namespace sample-server-ns describe svc
+Name:                     sample-server-load-balancer
+Namespace:                sample-server-ns
+Labels:                   target=sample-server
+Annotations:              <none>
+Selector:                 app=sample-server-app
+Type:                     LoadBalancer
+IP:                       10.43.102.253
+LoadBalancer Ingress:     44.71.0.148
+Port:                     http  80/TCP
+TargetPort:               8000/TCP
+NodePort:                 http  30324/TCP
+Endpoints:                10.42.3.57:8000,10.42.5.49:8000
+Session Affinity:         None
+External Traffic Policy:  Cluster
+```
+
+<!-- Links for 1st chapter -->
+[httpbin-namespace-definition-file]: ./httpbin/httpbin.yml
+[httpbin-deployment-definition-file]: ./httpbin/httpbin_deployment.yml
+[httpbin-service-definition-file]: ./httpbin/httpbin_service.yml
+[httpbin-ingress-definition-file]: ./httpbin/httpbin_ingress.yml
+[httpbin-traefik-k8s-annotations]: https://doc.traefik.io/traefik/v1.7/configuration/backends/kubernetes/#annotations
 [config-best-practices-naked-post]: https://kubernetes.io/docs/concepts/configuration/overview/#naked-pods-vs-replicasets-deployments-and-jobs
+<!-- Links for 2nd chapter -->
+[sample_server-deployment-definition-file]: ./sample_server/sample_server_deployment.yml
+[sample_server-service-definition-file]: ./sample_server/sample_server_service.yml
+[sample_server-ingress-definition-file]: ./sample_server/sample_server_ingress.yml

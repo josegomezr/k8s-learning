@@ -1,0 +1,40 @@
+# DEPLOYMENT DEFINITION
+# ===
+# This will represent a set of containers (a pod) working together
+---
+apiVersion: apps/v1 # note here, not the same version as the namespace.
+kind: Deployment
+metadata:
+  # object name, notice `-deployment`. Although so far is not used anywhere
+  name: sample-server-deployment
+  # notice here, we want to use the same "universe"  defined in sample-server.yml
+  namespace: sample-server-ns
+  # We'll use this later for filtering resources
+  labels:
+    target: sample-server
+# This is the actual definition of the deployment
+spec:
+  # we want to have $replicas containers running
+  replicas: 2
+  # we want this for targeting which pods to scale it should match pods created
+  # with labels app=sample-server-app
+  selector:
+    matchLabels:
+      app: sample-server-app
+  # This is the template for creating the pod, which has only one container.
+  template:
+    metadata:
+      labels:
+        # Mind the -app, this needs to match with the selector above, and with
+        # the service (so we have access to this later).
+        app: sample-server-app
+    spec:
+      # Each replica will be consisting of the following containers.
+      containers:
+      - image: 'python:3-alpine'
+        imagePullPolicy: IfNotPresent
+        name: sample-server-pod-container
+        command: ['sh', '-c', 'mkdir -p /var/data; cd /var/data; echo $(date) > $(date +%s).txt; python3 -m http.server']
+        # expose the http service port of our image.
+        ports:
+        - containerPort: 8000
