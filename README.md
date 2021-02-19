@@ -983,7 +983,7 @@ Content-Length: 571
 
 ✨✨✨
 
-Proving the storage is persistent
+Proving that the storage is persistent
 ---
 
 To make sure we're REALLY outliving the pods with our storage, let's scale
@@ -996,9 +996,9 @@ No matter how many times we request it.
 To scale down a deployment:
 
 
-**📝 NOTE:** `--namespace` flag
-**📝 NOTE:** `--replicas` flag will edit the `spec.replicas` that we defiened as
-`2` to `0` dynamically.
+* **📝 NOTE:** `--namespace` flag
+* **📝 NOTE:** `--replicas` flag will edit the `spec.replicas` that was
+previously set as `2`. It'll write `0` instead.
 
 ```
 $ kubectl --namespace sample-server-ns scale deployment sample-server-deployment --replicas 0
