@@ -29,6 +29,11 @@ spec:
         # the service (so we have access to this later).
         app: sample-server-app
     spec:
+      volumes:
+      - name: sample-server-pv-storage
+        persistentVolumeClaim:
+          claimName: sample-server-pv-claim
+
       # Each replica will be consisting of the following containers.
       containers:
       - image: 'python:3-alpine'
@@ -38,3 +43,6 @@ spec:
         # expose the http service port of our image.
         ports:
         - containerPort: 8000
+        volumeMounts:
+        - mountPath: "/var/data"
+          name: sample-server-pv-storage
