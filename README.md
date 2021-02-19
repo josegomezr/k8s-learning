@@ -453,7 +453,7 @@ rm sample_server/sample_server_ingress.yml
 And last let's also tweak the service. You can
 [see it here sample_server/sample_server_service.yml][sample_server-service-definition-file]. Here let's see the diff for the service:
 
-```
+```diff
 # port here.
 # Funny enough, this port has to be unique if you're using a setup like me
 # where you have a single node K8S. Else you'll endup having a waiting for
@@ -615,7 +615,7 @@ _💬 Weird it says 50Mi, but for my current use case I don't mind. Maybe is ela
 
 Now, we point in the deployment file, that we want to use this reserved space.
 
-```
+```diff
     spec:
 # ... comments ...
 +      volumes:
