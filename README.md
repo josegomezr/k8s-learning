@@ -376,14 +376,14 @@ this I'll go the hyper lazy way. I'll spin up a pod with a python web server.
 Practically mimicing this:
 
 ```
-docker run --rm -it -p 8000:8000 python:3-alpine sh -c "mkdir -p /var/data; cd /var/data; echo $(date) > $(date +%s).txt; python3 -m http.server"
+docker run --rm -it -p 8000:8000 python:3-alpine sh -c "mkdir -p /var/data; cd /var/data; echo $(hostname): $(date) > "$(hostname)-$(date +%s).txt"; python3 -m http.server"
 ```
 
 **What this container does?**
 
 1. Creates `/var/data`
 2. Change dir to `/var/data`
-3. Writes a file (conveniently, a "unique" each time).
+3. Writes a file (conveniently, somewhat "unique" each time).
 4. Runs the server
 
 So far this is exactly behaving as our pods so far, if I go into the container
@@ -426,7 +426,7 @@ the deployment:
 -        name: httpbin-pod-container
 +        name: sample-server-pod-container
 # adding the command
-+        command: ['sh', '-c', 'mkdir -p /var/data; cd /var/data; echo $(date) > $(date +%s).txt; python3 -m http.server']
++        command: ['sh', '-c', 'mkdir -p /var/data; cd /var/data; echo $(hostname): $(date) > "$(hostname)-$(date +%s).txt"; python3 -m http.server']
          # expose the http service port of our image.
          ports:
 # here the containerPort
@@ -470,15 +470,82 @@ Labels:                   target=sample-server
 Annotations:              <none>
 Selector:                 app=sample-server-app
 Type:                     LoadBalancer
-IP:                       10.43.102.253
-LoadBalancer Ingress:     44.71.0.148
+IP Families:              <none>
+IP:                       10.43.108.209
+IPs:                      10.43.108.209
 Port:                     http  80/TCP
 TargetPort:               8000/TCP
-NodePort:                 http  30324/TCP
-Endpoints:                10.42.3.57:8000,10.42.5.49:8000
+NodePort:                 http  32645/TCP
+Endpoints:                <none>
 Session Affinity:         None
 External Traffic Policy:  Cluster
+Events:                   <none>
 ```
+
+Now, let's query that node:
+
+```
+$ curl --dump-header - 192.168.122.76:32645
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.9.1
+Date: Fri, 19 Feb 2021 12:26:00 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 434
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="sample-server-deployment-69958fcd4c-cdngw-1613737473.txt">sample-server-deployment-69958fcd4c-cdngw-1613737473.txt</a></li>
+</ul>
+<hr>
+</body>
+</html>
+
+$ curl --dump-header - 192.168.122.76:32645
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.9.1
+Date: Fri, 19 Feb 2021 12:26:00 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 434
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Directory listing for /</title>
+</head>
+<body>
+<h1>Directory listing for /</h1>
+<hr>
+<ul>
+<li><a href="sample-server-deployment-69958fcd4c-qcnc6-1613737476.txt">sample-server-deployment-69958fcd4c-qcnc6-1613737476.txt</a></li>
+</ul>
+<hr>
+</body>
+</html>
+```
+
+Interesting! So we have now two different responses (which means our load balancer is load balancing! ✨) here:
+
+```
+sample-server-deployment-69958fcd4c-cdngw-1613737473.txt
+sample-server-deployment-69958fcd4c-qcnc6-1613737476.txt
+```
+
+So, we need to mount some volume that can outlive our pods and it's mounted on
+`/var/data` so those files can persist. If you don't believe me, well destroy it
+and create it again. You'll see the filenames change :).
+
+Creating the volume
+-------------------
+
 
 <!-- Links for 1st chapter -->
 [httpbin-namespace-definition-file]: ./httpbin/httpbin.yml

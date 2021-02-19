@@ -34,7 +34,7 @@ spec:
       - image: 'python:3-alpine'
         imagePullPolicy: IfNotPresent
         name: sample-server-pod-container
-        command: ['sh', '-c', 'mkdir -p /var/data; cd /var/data; echo $(date) > $(date +%s).txt; python3 -m http.server']
+        command: ['sh', '-c', 'mkdir -p /var/data; cd /var/data; echo $(hostname): $(date) > "$(hostname)-$(date +%s).txt"; python3 -m http.server']
         # expose the http service port of our image.
         ports:
         - containerPort: 8000
