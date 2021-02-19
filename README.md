@@ -7,6 +7,7 @@ TOC
 ---
 
 * [🚨 BEFORE YOU BEGIN 🚨](#-before-you-begin-)
+* FIRST DAY
 * [How to read this?](#how-to-read-this)
 * [TL;DR I want easy route](#tldr-i-want-easy-route)
 * [⚠️ WARNING ⚠️](#%EF%B8%8F-warning-%EF%B8%8F)
@@ -14,6 +15,11 @@ TOC
 * [Have something running, even if you can't access it yet](#have-something-running-even-if-you-cant-access-it-yet)
 * [Connecting your deployment to the "outside world"](#connecting-your-deployment-to-the-outside-world)
 * [Using request-rewriting! [optional]](#using-request-rewriting-optional)
+* SECOND DAY
+* [2nd session](#2nd-session)
+* [Adapting our pods to be python http.server](#adapting-our-pods-to-be-python-httpserver)
+* [Creating the volume](#creating-the-volume)
+* [Proving the storage is persistent](#proving-the-storage-is-persistent)"
 
 🚨 BEFORE YOU BEGIN 🚨
 ---
